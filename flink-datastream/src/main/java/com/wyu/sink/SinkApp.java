@@ -1,15 +1,13 @@
 package com.wyu.sink;
 
-import com.wyu.source.LogSource;
-import com.wyu.source.model.Student;
 import com.wyu.transformation.model.Log;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.util.Collector;
+import org.apache.flink.streaming.connectors.redis.RedisSink;
+import org.apache.flink.streaming.connectors.redis.common.config.FlinkJedisPoolConfig;
 
 /**
  * @author novo
@@ -36,10 +34,14 @@ public class SinkApp {
                 return log;
             }
         }).keyBy(Log::getDomain).sum("traffic");
-        // 将域名访问流量总和写入数据库demo
         log.error("source: {}", source.getParallelism());
         mapStream.print(); // print()实际上是 addSink(printFunction)
-        mapStream.addSink(new MySQLSink());
+        // 将域名访问流量总和写入数据库
+        //mapStream.addSink(new MySQLSink());
+
+        // 将域名访问流量总和写入redis https://bahir.apache.org/docs/flink/current/flink-streaming-redis/
+        FlinkJedisPoolConfig conf = new FlinkJedisPoolConfig.Builder().setHost("plato.redis").setDatabase(7).setPassword("redis").build();
+        mapStream.addSink(new RedisSink<>(conf, new RedisExampleMapper()));
         env.execute();
     }
 }
